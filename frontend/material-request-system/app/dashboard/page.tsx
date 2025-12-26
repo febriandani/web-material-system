@@ -1,6 +1,19 @@
-import { Bell, FileText, Grid, Package, Plus, Search, User } from "lucide-react";
-import React from "react";
+"use client";
 
+import {
+  Bell,
+  FileText,
+  Grid,
+  Package,
+  Plus,
+  Search,
+  User,
+} from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import api from "@/lib/api";
+import { clearAuth, getRefreshToken } from "@/lib/auth";
+import ProfileDropdown from "@/components/ProfileDropdown";
 /* ================= TYPES ================= */
 
 type MRStatus = "Done" | "Open" | "In Progress" | "Hold";
@@ -23,9 +36,46 @@ interface MenuItemProps {
   active?: boolean;
 }
 
+interface UserData {
+  id: number;
+  username: string;
+  fullName: string;
+  role: string;
+  departmentId: number;
+  email: string;
+  phone: string;
+}
+
 /* ================= PAGE ================= */
 
 export default function MaterialRequestPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<UserData | null>(null);
+  const [openProfile, setOpenProfile] = useState(false);
+
+  useEffect(() => {
+    const u = localStorage.getItem("user");
+    if (!u) {
+      router.push("/login");
+      return;
+    }
+    setUser(JSON.parse(u));
+  }, [router]);
+
+  const handleLogout = async () => {
+    try {
+      await api.post("/auth/logout", {
+        refresh_token: getRefreshToken(),
+      });
+    } catch (err) {
+      // ignore
+    } finally {
+      clearAuth();
+      localStorage.removeItem("user");
+      router.push("/login");
+    }
+  };
+
   const data: MRData[] = [
     {
       mr: "MR-2024-1245",
@@ -68,38 +118,64 @@ export default function MaterialRequestPage() {
 
   return (
     <div className="flex min-h-screen bg-[#0B1220] text-gray-200">
-      {/* Sidebar */}
+      {/* ================= SIDEBAR ================= */}
       <aside className="w-64 bg-[#070D1A] p-6 space-y-6">
         <div>
           <h1 className="text-blue-500 font-semibold">Material Request</h1>
           <p className="text-xs text-gray-400">Administrator</p>
         </div>
+
         <nav className="space-y-2">
           <MenuItem icon={<Grid size={18} />} label="Dashboard" />
-          <MenuItem icon={<FileText size={18} />} label="Work List MR" active />
+          <MenuItem
+            icon={<FileText size={18} />}
+            label="Work List MR"
+            active
+          />
           <MenuItem icon={<Plus size={18} />} label="Form Request" />
           <MenuItem icon={<Package size={18} />} label="Availability Part" />
         </nav>
       </aside>
 
-      {/* Main */}
+      {/* ================= MAIN ================= */}
       <main className="flex-1 p-6">
-        {/* Top Bar */}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">Work List Material Request</h2>
-          <div className="flex items-center gap-4">
-            <Bell className="text-gray-400" />
-            <div className="flex items-center gap-2">
-              <User className="bg-blue-600 rounded-full p-1" />
-              <div className="text-sm">
-                <p className="font-medium">Admin User</p>
-                <p className="text-xs text-gray-400">Administrator</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* ================= TOP BAR ================= */}
+<div className="flex justify-between items-center mb-6">
+  <h2 className="text-xl font-semibold">
+    Work List Material Request
+  </h2>
 
-        {/* Filter */}
+  <div className="flex items-center gap-4 relative">
+    <Bell className="text-gray-400 cursor-pointer" />
+
+    {/* PROFILE TRIGGER */}
+    <div
+      className="flex items-center gap-2 cursor-pointer"
+      onClick={() => setOpenProfile((prev) => !prev)}
+    >
+      <User className="bg-blue-600 rounded-full p-1" />
+      <div className="text-sm text-left">
+        <p className="font-medium">
+          {user?.fullName || user?.username}
+        </p>
+        <p className="text-xs text-gray-400">{user?.role}</p>
+      </div>
+    </div>
+
+    {/* PROFILE DROPDOWN */}
+    {openProfile && user && (
+      <div className="absolute right-0 top-12 z-50">
+        <ProfileDropdown
+          user={user}
+          onLogout={handleLogout}
+        />
+      </div>
+    )}
+  </div>
+</div>
+
+
+        {/* ================= FILTER ================= */}
         <div className="bg-[#0F172A] rounded-xl p-4 mb-6 flex flex-wrap gap-3">
           <div className="flex items-center bg-[#020617] rounded-lg px-3 py-2 w-64">
             <Search size={16} className="text-gray-400" />
@@ -108,14 +184,22 @@ export default function MaterialRequestPage() {
               className="bg-transparent outline-none text-sm ml-2 w-full"
             />
           </div>
+
           <select className="bg-[#020617] rounded-lg px-3 py-2 text-sm">
             <option>Semua Status</option>
           </select>
-          <input type="date" className="bg-[#020617] rounded-lg px-3 py-2 text-sm" />
-          <input type="date" className="bg-[#020617] rounded-lg px-3 py-2 text-sm" />
+
+          <input
+            type="date"
+            className="bg-[#020617] rounded-lg px-3 py-2 text-sm"
+          />
+          <input
+            type="date"
+            className="bg-[#020617] rounded-lg px-3 py-2 text-sm"
+          />
         </div>
 
-        {/* Table */}
+        {/* ================= TABLE ================= */}
         <div className="bg-[#0F172A] rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-[#020617] text-gray-400">
@@ -132,6 +216,7 @@ export default function MaterialRequestPage() {
                 <th className="p-3">Approval</th>
               </tr>
             </thead>
+
             <tbody>
               {data.map((row) => (
                 <tr key={row.mr} className="border-b border-gray-800">
